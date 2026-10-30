@@ -1,0 +1,12 @@
+node_modules
+*.log
+.DS_Store
+
+# dotenv environment variable files
+.env
+.env.*
+!.env.example
+
+# local agent scratch
+.atl/
+odd/

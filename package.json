@@ -1,0 +1,46 @@
+{
+  "name": "fix-claude-code-permissions",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Unblock a Claude Code binary that macOS refuses to launch, locally or over SSH, with no GUI session",
+  "license": "MIT",
+  "author": "Elvis Gastelum",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elvisgastelum/fix-claude-code-permissions.git"
+  },
+  "bin": {
+    "fix-claude-code": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "fix-claude-code": "node dist/cli.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.14.0",
+      "onFail": "download"
+    },
+    "runtime": {
+      "name": "node",
+      "version": "24.22.1",
+      "onFail": "ignore"
+    }
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  }
+}

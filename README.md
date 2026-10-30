@@ -1,6 +1,6 @@
 # fix-claude-code-permissions
 
-Unblock a Claude Code binary that macOS refuses to launch, over SSH, with no GUI session.
+Unblock a Claude Code binary that macOS refuses to launch, locally or over SSH, with no GUI session.
 
 ## Symptom
 
@@ -14,39 +14,83 @@ The binary itself is fine: Anthropic PBC Developer ID (Team `Q6L2SF6YDW`), valid
 The launch is held by `syspolicyd` (often wedged after days of uptime, logging
 `Unable to initialize qtn_proc`), or by a Gatekeeper prompt on a screen nobody can see.
 
-## What the fix does
+## Install
 
-1. Refuses to touch anything unless the binary is validly signed by Anthropic's Team ID and notarized.
-2. Removes `com.apple.quarantine` from that one binary.
-3. If the launch still hangs, runs `sudo killall syspolicyd`. launchd respawns it.
-4. Re-tests `claude --version` after each step and stops as soon as it works.
+Needs only `git` and `node` on the Mac. No `pnpm install`: the built `dist/` is committed.
 
-It never reboots, never edits other binaries, and does not use `spctl --add` (unsupported on recent macOS).
+```sh
+curl -fsSL https://raw.githubusercontent.com/elvisgastelum/fix-claude-code-permissions/main/install.sh | bash
+```
 
-## Usage
+It clones into `${FIX_CLAUDE_CODE_HOME:-$HOME/.local/share/fix-claude-code}` and writes a launcher at
+`${FIX_CLAUDE_CODE_BIN_DIR:-$HOME/.local/bin}/fix-claude-code`. Re-run it to update. Remove it with:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/elvisgastelum/fix-claude-code-permissions/main/install.sh | bash -s -- --uninstall
+```
+
+`FIX_CLAUDE_CODE_REPO` and `FIX_CLAUDE_CODE_REF` override the repository URL and branch.
+
+## Use
 
 On the Mac:
 
 ```sh
-./fix-claude-code.sh diagnose            # read-only report
-./fix-claude-code.sh fix                 # needs passwordless sudo, or:
-echo "$PASSWORD" | ./fix-claude-code.sh fix --password-stdin
+fix-claude-code diagnose                       # read-only report
+fix-claude-code fix --password-stdin < file    # repair; sudo password from the first line of stdin
 ```
 
-From another machine (default host alias `personal`):
+From another machine, over SSH (the Mac must have it installed; `<host>` is any ssh alias or `user@host`):
 
 ```sh
-./remote-fix.sh diagnose
-./remote-fix.sh fix                      # prompts for the admin password
-PASSWORD_FILE=/path/to/secret ./remote-fix.sh fix
+fix-claude-code remote <host> diagnose
+fix-claude-code remote <host> fix              # prompts for the admin password without echo
+fix-claude-code remote <host> fix --password-file ./pw
 ```
 
-`--binary PATH` targets a specific binary; otherwise `claude` is resolved from a login shell, then
-`/opt/homebrew/bin`, `~/.local/bin` and `/usr/local/bin`. `TEST_TIMEOUT` (seconds, default 20) bounds each launch test.
+`remote` runs the launcher that `install.sh` wrote on the Mac, so install it there first. The machine you
+run `remote` from needs `node` (and a copy of this tool) plus `ssh`; the macOS tools are used only on the Mac.
 
-Exit codes: `0` launches fine, `1` still failing, `2` refused or bad usage.
+| Option                 | Meaning                                               |
+| ---------------------- | ----------------------------------------------------- |
+| `--binary PATH`        | target this binary instead of finding `claude`        |
+| `--timeout SECONDS`    | bound each launch test (default 20)                   |
+| `--password-stdin`     | read the admin password from the first line of stdin  |
+| `--password-file PATH` | read the admin password from the first line of a file |
+
+Exit codes: `0` launches fine, `1` still failing, `2` refused or bad usage, `130` cancelled.
+
+## What `fix` does
+
+1. Refuses to touch anything unless the binary is validly signed by Anthropic's Team ID and notarized.
+2. Removes `com.apple.quarantine` from that one binary and re-tests.
+3. If the launch still hangs, runs `sudo killall syspolicyd` (launchd respawns it) and re-tests.
+4. Stops as soon as `claude --version` works.
+
+It never reboots, never edits other binaries, and does not use `spctl --add` (unsupported on recent macOS).
+`diagnose` changes nothing.
+
+## Secrets
+
+The admin password is only ever read from a prompt, a file you name, or stdin, and sent to `sudo -S` and
+over `ssh` through stdin. It is never a command-line argument, never written to disk by this tool, and
+never printed. Do not commit password files.
 
 ## If it still fails
 
 Approve the binary on the machine (System Settings > Privacy & Security > Open Anyway), or reboot it.
 Check that remote login survives a reboot first (FileVault pre-boot login blocks SSH).
+
+## Development
+
+Vite+ is the development stack only; users never install pnpm, `vp` or dependencies.
+
+```sh
+pnpm install
+vp check      # format, lint, type-check
+vp test
+vp pack       # rebuild dist/cli.mjs, then commit dist/
+```
+
+A test fails if the committed `dist/cli.mjs` differs from a fresh build, or if it imports anything that
+is not a `node:` module.
